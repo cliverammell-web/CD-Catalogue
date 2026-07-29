@@ -6159,9 +6159,11 @@ ${cd.notes?'Existing notes: '+cd.notes:''}
 Write in a style that combines three qualities: the warmth and personal voice of a knowledgeable friend who loves this music; the analytical depth of a music critic who can explain what makes this recording or work significant; and the practical focus of a pre-listening brief — telling the listener what to listen for, what makes this performance distinctive, any fascinating historical or contextual details about the work or the recording, and why it matters. Do NOT use bullet points or headings. Write in flowing paragraphs. Start directly with the music — no preamble like "This recording..." or "Welcome to...". Around 450 words.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://claude-proxy.retirementwealthcheck-account.workers.dev/', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1000,
@@ -6177,6 +6179,7 @@ Write in a style that combines three qualities: the warmth and personal voice of
     // Render as paragraphs
     body.innerHTML=text.trim().split(/\n\n+/).map(p=>'<p>'+p.replace(/\n/g,' ').trim()+'</p>').join('');
   } catch(err) {
+    console.error('Ask Claude error:', err);
     body.innerHTML='<p style="color:#c0392b">Unable to generate guide — please check your connection and try again.</p>';
   }
 }
