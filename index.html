@@ -1664,7 +1664,7 @@ function saveAdditions(arr){ localStorage.setItem('cd_additions',JSON.stringify(
 
 function getNextId(){
   const allIds=[...catalogue.map(c=>c.id),...getAdditions().map(c=>c.id)];
-  return allIds.length ? Math.max(...allIds)+1 : 539;
+  return allIds.length ? Math.max(...allIds)+1 : 1;
 }
 
 var _editingId=null;
