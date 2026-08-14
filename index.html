@@ -896,7 +896,7 @@ function printReport(){
 function exportData(){
   const data={
     exported: new Date().toISOString(),
-    version: 1,
+    version: 2,
     favourites: JSON.parse(localStorage.getItem('cd_favourites')||'[]'),
     deleted:    JSON.parse(localStorage.getItem('cd_deleted')||'[]'),
     catnos:     JSON.parse(localStorage.getItem('cd_catnos')||'{}'),
@@ -904,7 +904,8 @@ function exportData(){
     notes:      JSON.parse(localStorage.getItem('cd_notes')||'{}'),
     additions:  JSON.parse(localStorage.getItem('cd_additions')||'[]'),
     wishlist:   JSON.parse(localStorage.getItem('cd_wishlist')||'[]'),
-    played:     JSON.parse(localStorage.getItem('cd_played')||'{}')
+    played:     JSON.parse(localStorage.getItem('cd_played')||'{}'),
+    articles:   JSON.parse(localStorage.getItem('cd_articles')||'[]')
   };
   const counts=[
     data.favourites.length+' favourite(s)',
@@ -914,13 +915,14 @@ function exportData(){
     Object.keys(data.notes).length+' note(s)',
     data.wishlist.length+' wishlist item(s)',
     Object.keys(data.played).length+' listening log entry(ies)',
-    data.additions.length+' added CD(s)'
+    data.additions.length+' added CD(s)',
+    data.articles.length+' article(s)'
   ].filter(s=>!s.startsWith('0')).join(', ');
   const date=new Date().toISOString().slice(0,10);
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='clives-cds-data-'+date+'.json';
+  a.download='cd-catalogue-data-'+date+'.json';
   a.click();
   URL.revokeObjectURL(a.href);
   if(!counts) alert('Nothing to export yet — no personal data saved.');
@@ -942,7 +944,8 @@ function importData(e){
         Object.keys(data.catnos||{}).length+' cat.no. edit(s)',
         Object.keys(data.locations||{}).length+' location(s)',
         Object.keys(data.notes||{}).length+' note(s)',
-        (data.additions||[]).length+' added CD(s)'
+        (data.additions||[]).length+' added CD(s)',
+        (data.articles||[]).length+' article(s)'
       ].filter(s=>!s.startsWith('0')).join(', ');
       const saved=new Date(data.exported).toLocaleDateString();
       pendingImport=data;
@@ -968,6 +971,7 @@ function confirmImport(){
   if(d.played)localStorage.setItem('cd_played',JSON.stringify(d.played));
   if(d.wishlist)localStorage.setItem('cd_wishlist',JSON.stringify(d.wishlist));
   if(d.additions)localStorage.setItem('cd_additions',JSON.stringify(d.additions));
+  if(d.articles)localStorage.setItem('cd_articles',JSON.stringify(d.articles));
   pendingImport=null;
   document.getElementById('import-confirm').style.display='none';
   updateRestoreBtn();
@@ -1498,6 +1502,25 @@ function openArticles(){
   renderArticleList();
 }
 
+// Stored articles (imported from a restore file). Merged with the hardcoded metas.
+function getStoredArticles(){try{return JSON.parse(localStorage.getItem('cd_articles')||'[]');}catch(e){return[];}}
+function getStoredArticle(id){return getStoredArticles().find(a=>a.id===id);}
+function getMergedArticleMeta(){
+  const stored=getStoredArticles().filter(a=>a.type==='essay').map(a=>({id:a.id,title:a.title,subtitle:a.subtitle,cdCount:a.cdCount||0}));
+  const ids=new Set(articleMeta.map(a=>a.id));
+  return articleMeta.concat(stored.filter(a=>!ids.has(a.id)));
+}
+function getMergedGuideMeta(){
+  const stored=getStoredArticles().filter(a=>a.type==='guide').map(a=>({id:a.id,title:a.title,subtitle:a.subtitle,badge:a.badge||'Reference Guide'}));
+  const ids=new Set(guideMeta.map(g=>g.id));
+  return guideMeta.concat(stored.filter(a=>!ids.has(a.id)));
+}
+function getMergedConcertMeta(){
+  const stored=getStoredArticles().filter(a=>a.type==='concert').map(a=>({id:a.id,title:a.title,subtitle:a.subtitle,badge:a.badge||'Concert Guide'}));
+  const ids=new Set(concertMeta.map(c=>c.id));
+  return concertMeta.concat(stored.filter(a=>!ids.has(a.id)));
+}
+
 function closeArticles(){
   _currentArticleId=null; hideReturnBanner();
   setTimeout(function(){if(document.getElementById('more-btn'))updateMoreBtn();},50);
@@ -1514,7 +1537,7 @@ function renderArticleList(){
   window.scrollTo(0,0);
   const container=document.getElementById('art-list-items');
   if(_activeTab==='guides'){
-    container.innerHTML=guideMeta.map(g=>
+    container.innerHTML=getMergedGuideMeta().map(g=>
       `<div class="art-guide-item" onclick="openGuide('${g.id}')">
         <h3>${g.title}</h3>
         <p>${g.subtitle}</p>
@@ -1522,7 +1545,7 @@ function renderArticleList(){
       </div>`
     ).join('');
   } else if(_activeTab==='concerts'){
-    container.innerHTML=concertMeta.map(c=>
+    container.innerHTML=getMergedConcertMeta().map(c=>
       `<div class="art-guide-item-concert" onclick="openArticle('${c.id}')">
         <h3>${c.title}</h3>
         <p>${c.subtitle}</p>
@@ -1530,7 +1553,7 @@ function renderArticleList(){
       </div>`
     ).join('');
   } else {
-    container.innerHTML=articleMeta.map(a=>
+    container.innerHTML=getMergedArticleMeta().map(a=>
       `<div class="art-list-item" onclick="openArticle('${a.id}')">
         <h3>${a.title}</h3>
         <p>${a.subtitle}</p>
@@ -1543,13 +1566,16 @@ function renderArticleList(){
 let _currentArticleId=null;
 function openArticle(id){
   _currentArticleId=id;
-  const content=document.getElementById('art-content-'+id);
-  if(!content)return;
+  let contentHtml=null;
+  const domNode=document.getElementById('art-content-'+id);
+  if(domNode){contentHtml=domNode.innerHTML;}
+  else{const stored=getStoredArticle(id);if(stored)contentHtml=stored.content;}
+  if(contentHtml===null)return;
   document.getElementById('article-list-view').style.display='none';
   const reader=document.getElementById('article-reader-view');
   reader.style.display='block';
-  document.getElementById('article-reader-content').innerHTML=content.innerHTML;
-  const isConcertGuide=concertMeta.some(c=>c.id===id);
+  document.getElementById('article-reader-content').innerHTML=contentHtml;
+  const isConcertGuide=getMergedConcertMeta().some(c=>c.id===id);
   document.getElementById('print-guide-btn').style.display=isConcertGuide?'inline-block':'none';
   reader.scrollTop=0;
   window.scrollTo(0,0);
@@ -1570,12 +1596,15 @@ function printGuide(){
   document.title=originalTitle;
 }
 function openGuide(id){
-  const content=document.getElementById('guide-content-'+id);
-  if(!content)return;
+  let contentHtml=null;
+  const domNode=document.getElementById('guide-content-'+id);
+  if(domNode){contentHtml=domNode.innerHTML;}
+  else{const stored=getStoredArticle(id);if(stored)contentHtml=stored.content;}
+  if(contentHtml===null)return;
   document.getElementById('article-list-view').style.display='none';
   const reader=document.getElementById('article-reader-view');
   reader.style.display='block';
-  document.getElementById('article-reader-content').innerHTML=content.innerHTML;
+  document.getElementById('article-reader-content').innerHTML=contentHtml;
   document.getElementById('print-guide-btn').style.display='inline-block';
   reader.scrollTop=0;
   window.scrollTo(0,0);
