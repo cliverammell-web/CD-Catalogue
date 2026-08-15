@@ -1,8 +1,8 @@
-</div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Classical CD Catalogue</title>
@@ -144,8 +144,11 @@ header h1 span{color:var(--gold);font-style:italic}
 .delete-confirm-btns{display:flex;gap:0.5rem;justify-content:center}
 .btn-yes{padding:0.45rem 1.2rem;background:#b83232;color:white;border:none;border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:0.82rem;cursor:pointer}
 .btn-no{padding:0.45rem 1.2rem;background:none;border:1.5px solid var(--border);border-radius:var(--radius);font-family:'DM Sans',sans-serif;font-size:0.82rem;cursor:pointer;color:var(--text-mid)}
-.no-results{text-align:center;padding:3rem 1.5rem}
-.no-results-icon{font-size:2.5rem;margin-bottom:0.75rem}
+.no-results{text-align:center;padding:1.25rem 1.5rem 1.25rem}
+.no-results-icon{font-size:2.2rem;margin-bottom:0.5rem}
+.cards:empty{padding:0}
+.no-results-add{margin-top:1rem;background:#2a7a2a;color:#fff;border:none;padding:0.7rem 1.4rem;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:500;cursor:pointer}
+.no-results-add:active{background:#1a5a1a}
 .no-results h3{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--text-mid);margin-bottom:0.5rem}
 .no-results p{font-size:0.85rem;color:var(--text-light)}
 .not-found-msg{display:none;text-align:center;margin:0.5rem 1rem;padding:0.75rem;background:var(--red-bg);border-radius:var(--radius);color:var(--red);font-size:0.85rem;font-weight:500}
@@ -588,8 +591,9 @@ header h1 span{color:var(--gold);font-style:italic}
 
 <div class="no-results" id="no-results" style="display:none">
   <div class="no-results-icon">&#127925;</div>
-  <h3>Not in your collection</h3>
-  <p>Safe to buy!</p>
+  <h3 id="no-results-title">Not in your collection</h3>
+  <p id="no-results-sub">Safe to buy!</p>
+  <button class="no-results-add" id="no-results-add" style="display:none" onclick="openAddCD()">&#43; Add your first CD</button>
 </div>
 
 <button class="scroll-fab" id="scroll-fab" onclick="scrollFab()" title="Scroll to bottom">&#8964;</button>
@@ -1267,8 +1271,19 @@ function render(q){
 
   if(!filtered.length){
     container.innerHTML='';
-    noRes.style.display='block';
-    notFound.classList.add('visible');
+    var _isFilt=q||activeFilter||activeComposer||activeArtist||activeLabel||activeCategory;
+    var _emptyLib=!_isFilt&&total===0;
+    if(q){
+      // Active search: the compact red banner near the top is the whole message.
+      noRes.style.display='none';
+      notFound.classList.add('visible');
+    } else {
+      notFound.classList.remove('visible');
+      noRes.style.display='block';
+      document.getElementById('no-results-title').textContent=_emptyLib?'Your catalogue is empty':'No matches';
+      document.getElementById('no-results-sub').textContent=_emptyLib?'Add your first CD to get started.':'Try clearing a filter.';
+      document.getElementById('no-results-add').style.display=_emptyLib?'inline-block':'none';
+    }
   } else {
     noRes.style.display='none';
     notFound.classList.remove('visible');
@@ -1496,6 +1511,7 @@ function switchTab(tab) {
 function openArticles(){
   document.getElementById('cards').style.display='none';
   document.getElementById('no-results').style.display='none';
+  document.getElementById('not-found-msg').classList.remove('visible');
   document.getElementById('article-panel').style.display='block';
   document.getElementById('articles-chip').classList.add('active');
   document.querySelectorAll('.filter-chip[data-filter]').forEach(b=>b.classList.remove('active'));
@@ -1907,6 +1923,7 @@ var _editingWLId=null;
 function openWishlist(){
   document.getElementById('cards').style.display='none';
   document.getElementById('no-results').style.display='none';
+  document.getElementById('not-found-msg').classList.remove('visible');
   document.getElementById('wishlist-panel').style.display='block';
   document.getElementById('wishlist-chip').classList.add('active');
   renderWishlist();
