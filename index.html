@@ -1677,6 +1677,7 @@ function openEditCD(id,e){
   document.getElementById('add-cd-hdr').querySelector('span').textContent='Edit CD '+id;
   document.getElementById('acd-submit-btn').textContent='Save Changes';
   document.getElementById('acd-error').style.display='none';
+  document.getElementById('acd-lookup-status').textContent='';
   document.getElementById('acd-label').value=cd.label||'';
   document.getElementById('acd-composers').value=(cd.composers||[]).join(', ');
   document.getElementById('acd-artist').value=cd.artist||'';
@@ -1700,6 +1701,7 @@ function openAddCD(){
   document.getElementById('acd-id-preview').textContent='Will be assigned CD '+getNextId();
   populateFormDataLists();
   document.getElementById('acd-error').style.display='none';
+  document.getElementById('acd-lookup-status').textContent='';
   ['acd-label','acd-composers','acd-artist','acd-title','acd-catno','acd-notes'].forEach(function(id){
     document.getElementById(id).value='';
   });
@@ -2225,6 +2227,10 @@ async function lookupWLCatNo(){
     </div>
     <div id="add-cd-body">
       <div class="acd-field">
+        <label>Catalogue Number <span class="acd-hint">optional — look up to pre-fill</span></label>
+        <div style="display:flex;gap:.5rem"><input id="acd-catno" type="text" placeholder="e.g. CDA67288" style="flex:1" autocomplete="off"><button type="button" id="acd-lookup-btn" onclick="lookupCatNo()" style="background:#1B2B5B;color:#fff;border:none;padding:.6rem .9rem;border-radius:6px;font-size:.8rem;cursor:pointer;white-space:nowrap;font-family:inherit">🔍 Look Up</button></div><div id="acd-lookup-status" style="font-size:.75rem;margin-top:.3rem;min-height:1rem;color:#888"></div>
+      </div>
+      <div class="acd-field">
         <label>Label *</label>
         <input id="acd-label" type="text" placeholder="e.g. Hyperion, Deutsche Grammophon" list="acd-label-dl" autocomplete="off">
       </div>
@@ -2240,10 +2246,6 @@ async function lookupWLCatNo(){
       <div class="acd-field">
         <label>Title *</label>
         <input id="acd-title" type="text" placeholder="e.g. Bach: Goldberg Variations">
-      </div>
-      <div class="acd-field">
-        <label>Catalogue Number</label>
-        <div style="display:flex;gap:.5rem"><input id="acd-catno" type="text" placeholder="e.g. CDA67288" style="flex:1"><button type="button" id="acd-lookup-btn" onclick="lookupCatNo()" style="background:#1B2B5B;color:#fff;border:none;padding:.6rem .9rem;border-radius:6px;font-size:.8rem;cursor:pointer;white-space:nowrap;font-family:inherit">🔍 Look Up</button></div><div id="acd-lookup-status" style="font-size:.75rem;margin-top:.3rem;min-height:1rem;color:#888"></div>
       </div>
       <div class="acd-field">
         <label>Format</label>
