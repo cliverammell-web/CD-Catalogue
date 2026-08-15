@@ -331,6 +331,15 @@ header h1 span{color:var(--gold);font-style:italic}
     font-weight:500; cursor:pointer; font-family:inherit; }
   #acd-submit-btn:active { background:#1a5a1a; }
   #acd-id-preview { font-size:.75rem; color:#999; }
+  #acd-danger { display:none; margin-top:1.1rem; padding-top:.9rem; border-top:1px solid #E8E0D0; }
+  .acd-delete-btn { width:100%; padding:.65rem; background:none; border:1.5px solid #b83232;
+    border-radius:8px; color:#b83232; font-size:.85rem; font-weight:500; cursor:pointer; font-family:inherit; }
+  .acd-delete-btn:active { background:#fdf0f0; }
+  .acd-delete-confirm { display:none; margin-top:.6rem; padding:.75rem; background:#fdf0f0;
+    border-radius:8px; text-align:center; }
+  .acd-delete-confirm.visible { display:block; }
+  .acd-delete-confirm p { font-size:.82rem; color:#b83232; margin-bottom:.6rem; }
+  .acd-delete-btns { display:flex; gap:.5rem; justify-content:center; }
   #acd-error { background:#fde8e8; border:1px solid #e08080; color:#8b0000;
     padding:.55rem .75rem; border-radius:6px; font-size:.82rem;
     margin-top:.5rem; }
@@ -370,6 +379,11 @@ header h1 span{color:var(--gold);font-style:italic}
   .played-tag{font-size:.75rem;color:#2a7a2a;padding:.15rem 0;font-style:italic;}
   .played-btn{display:block;width:100%;padding:.5rem;margin:.3rem 0;background:#f0fff0;border:1.5px solid #4a9a4a;color:#1a5a1a;border-radius:8px;font-size:.82rem;font-weight:500;cursor:pointer;font-family:inherit;text-align:center;}
   .played-btn:active{background:#d0f0d0;}
+
+  /* Paired button rows inside the expanded card */
+  .card-btn-row{display:flex;gap:.5rem;margin-top:.55rem;}
+  .card-btn-row>button{flex:1 1 0;min-width:0;width:auto;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .card-btn-row.compact>button{padding:.42rem .4rem;font-size:.78rem;}
 
   .filter-chip-more{background:#1B2B5B!important;color:#fff!important;border-color:#1B2B5B!important;font-weight:500;}
   .filter-chip-more.secondary-active{background:#C8A84B!important;border-color:#C8A84B!important;color:#1B2B5B!important;}
@@ -1297,6 +1311,17 @@ function render(q){
       catalogue.some(o=>o.id!==cd.id&&o.duplicateGroup===cd.duplicateGroup&&!deleted.includes(o.id));
     const isAddition=getAdditions().some(function(a){return a.id===cd.id;});
     const editBtn=isAddition?'<button class="edit-cd-btn" onclick="openEditCD('+cd.id+',event)">&#9998; Edit</button>':'';
+    // Remove lives inside the Edit modal. CDs with no Edit button keep an on-card fallback
+    // so nothing can become impossible to remove.
+    const fallbackDelete=isAddition?'':
+      '<button class="delete-btn" onclick="showConfirm('+cd.id+',event)">Remove from collection</button>'+
+      '<div class="delete-confirm" id="confirm-'+cd.id+'">'+
+        '<p>Remove this CD?<br><strong>'+cd.title+'</strong></p>'+
+        '<div class="delete-confirm-btns">'+
+          '<button class="btn-no" onclick="hideConfirm('+cd.id+',event)">Cancel</button>'+
+          '<button class="btn-yes" onclick="deleteCD('+cd.id+')">Yes, remove it</button>'+
+        '</div>'+
+      '</div>';
     var _pd=getPlayedDate(cd.id);
     var playedTag=_pd?'<div class="played-tag">♫ Last played: '+fmtPlayedDate(_pd)+'</div>':'';
     var playedBtn='<button class="played-btn" onclick="markPlayed('+cd.id+',event)">♫ Played today</button>';
@@ -1377,20 +1402,14 @@ function render(q){
           '</div>'+
         '</div>'+
         playedTag+
-        playedBtn+
-        '<button class="tracks-btn" onclick="showTracks('+cd.id+',event)">&#127925; Show tracks on MusicBrainz</button>'+
-        '<button class="presto-btn" onclick="playOnPresto('+cd.id+',event)">&#9658; Play on Presto Music</button>'+
+        '<div class="card-btn-row">'+editBtn+playedBtn+'</div>'+
+        '<div class="card-btn-row compact">'+
+          '<button class="tracks-btn" title="Show tracks on MusicBrainz" onclick="showTracks('+cd.id+',event)">&#127925; MusicBrainz</button>'+
+          '<button class="presto-btn" title="Play on Presto Music" onclick="playOnPresto('+cd.id+',event)">&#9658; Presto Music</button>'+
+        '</div>'+
         '<button class="ask-claude-btn" onclick="askClaude('+cd.id+',event)">&#10024; Ask Claude about this CD</button>'+
         '<div class="tracks-panel" id="tracks-panel-'+cd.id+'"></div>'+
-        editBtn+
-        '<button class="delete-btn" onclick="showConfirm('+cd.id+',event)">Remove from collection</button>'+
-        '<div class="delete-confirm" id="confirm-'+cd.id+'">'+
-          '<p>Remove this CD?<br><strong>'+cd.title+'</strong></p>'+
-          '<div class="delete-confirm-btns">'+
-            '<button class="btn-no" onclick="hideConfirm('+cd.id+',event)">Cancel</button>'+
-            '<button class="btn-yes" onclick="deleteCD('+cd.id+')">Yes, remove it</button>'+
-          '</div>'+
-        '</div>'+
+        fallbackDelete+
       '</div>'+
     '</div>';
   }).join('');
@@ -1707,6 +1726,9 @@ function openEditCD(id,e){
   for(var i=0;i<fmt.options.length;i++){if(fmt.options[i].value===cd.format){fmt.selectedIndex=i;break;}}
   document.getElementById('acd-category').value=cd.category||'';
   document.getElementById('acd-id-preview').textContent='Editing CD '+id;
+  document.getElementById('acd-danger').style.display='block';
+  document.getElementById('acd-delete-confirm').classList.remove('visible');
+  document.getElementById('acd-delete-title').textContent=cd.title||('CD '+id);
   populateFormDataLists();
 }
 function openAddCD(){
@@ -1718,6 +1740,8 @@ function openAddCD(){
   populateFormDataLists();
   document.getElementById('acd-error').style.display='none';
   document.getElementById('acd-lookup-status').textContent='';
+  document.getElementById('acd-danger').style.display='none';
+  document.getElementById('acd-delete-confirm').classList.remove('visible');
   ['acd-label','acd-composers','acd-artist','acd-title','acd-catno','acd-notes'].forEach(function(id){
     document.getElementById(id).value='';
   });
@@ -1731,6 +1755,23 @@ function openAddCD(){
 function closeAddCD(){
   _editingId=null;
   document.getElementById('add-cd-overlay').style.display='none';
+  document.getElementById('acd-delete-confirm').classList.remove('visible');
+}
+
+// ── Remove from collection, from inside the Edit modal ──
+function showAcdDelete(){
+  var c=document.getElementById('acd-delete-confirm');
+  c.classList.add('visible');
+  c.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function hideAcdDelete(){
+  document.getElementById('acd-delete-confirm').classList.remove('visible');
+}
+function confirmAcdDelete(){
+  var id=_editingId;
+  if(id===null||id===undefined)return;
+  closeAddCD();
+  deleteCD(id);
 }
 
 function submitAddCD(){
@@ -2318,6 +2359,16 @@ async function lookupWLCatNo(){
         <textarea id="acd-notes" rows="4" placeholder="Your notes about this recording..."></textarea>
       </div>
       <div id="acd-error" style="display:none"></div>
+      <div id="acd-danger">
+        <button type="button" class="acd-delete-btn" onclick="showAcdDelete()">&#128465; Remove from collection</button>
+        <div class="acd-delete-confirm" id="acd-delete-confirm">
+          <p>Remove this CD?<br><strong id="acd-delete-title"></strong></p>
+          <div class="acd-delete-btns">
+            <button type="button" class="btn-no" onclick="hideAcdDelete()">Cancel</button>
+            <button type="button" class="btn-yes" onclick="confirmAcdDelete()">Yes, remove it</button>
+          </div>
+        </div>
+      </div>
       <datalist id="acd-label-dl"></datalist>
       <datalist id="acd-artist-dl"></datalist>
     </div>
