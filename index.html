@@ -1711,6 +1711,27 @@ function getNextId(){
   return allIds.length ? Math.max(...allIds)+1 : 1;
 }
 
+// Move everything keyed by CD number when a CD is renumbered, so catalogue
+// numbers, shelf locations, notes, favourites and played dates follow the CD.
+function renumberCDSideData(oldId,newId){
+  ['cd_catnos','cd_locations','cd_notes','cd_played'].forEach(function(k){
+    var o;
+    try{ o=JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){ return; }
+    if(Object.prototype.hasOwnProperty.call(o,String(oldId))){
+      o[String(newId)]=o[String(oldId)];
+      delete o[String(oldId)];
+      localStorage.setItem(k,JSON.stringify(o));
+    }
+  });
+  ['cd_favourites','cd_deleted'].forEach(function(k){
+    var a;
+    try{ a=JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return; }
+    var changed=false;
+    a=a.map(function(v){ if(String(v)===String(oldId)){changed=true;return newId;} return v; });
+    if(changed) localStorage.setItem(k,JSON.stringify(a));
+  });
+}
+
 var _editingId=null;
 function openEditCD(id,e){
   if(e)e.stopPropagation();
@@ -1734,7 +1755,9 @@ function openEditCD(id,e){
   var fmt=document.getElementById('acd-format');
   for(var i=0;i<fmt.options.length;i++){if(fmt.options[i].value===cd.format){fmt.selectedIndex=i;break;}}
   document.getElementById('acd-category').value=cd.category||'';
-  document.getElementById('acd-id-preview').textContent='Editing CD '+id;
+  document.getElementById('acd-num-field').style.display='block';
+  document.getElementById('acd-num').value=id;
+  document.getElementById('acd-id-preview').textContent='Editing CD '+id+' — number is kept on save';
   document.getElementById('acd-danger').style.display='block';
   document.getElementById('acd-delete-confirm').classList.remove('visible');
   document.getElementById('acd-delete-title').textContent=cd.title||('CD '+id);
@@ -1745,6 +1768,7 @@ function openAddCD(){
   document.getElementById('add-cd-hdr').querySelector('span').textContent='Add New CD';
   document.getElementById('acd-submit-btn').textContent='Add to Collection';
   document.getElementById('add-cd-overlay').style.display='flex';
+  document.getElementById('acd-num-field').style.display='none';
   document.getElementById('acd-id-preview').textContent='Will be assigned CD '+getNextId();
   populateFormDataLists();
   document.getElementById('acd-error').style.display='none';
@@ -1805,19 +1829,45 @@ function submitAddCD(){
   var composers=composersRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
   var usedGBP=usedRaw?parseFloat(usedRaw):0;
   var newGBP=newRaw?parseFloat(newRaw):null;
-  var id=getNextId();
-  var newCD={id:id,label:label,composers:composers,artist:artist,title:title,
+
+  var isEdit=(_editingId!==null&&_editingId!==undefined);
+  var oldId=_editingId;
+  var id;
+  if(isEdit){
+    // Editing keeps the CD's existing number unless it is deliberately changed.
+    id=oldId;
+    var numEl=document.getElementById('acd-num');
+    var wanted=numEl?parseInt(numEl.value,10):NaN;
+    if(!isNaN(wanted)&&wanted>0&&wanted!==oldId){
+      var taken=[].concat(catalogue,getAdditions()).some(function(c){return c.id===wanted;});
+      if(taken){
+        err.textContent='CD number '+wanted+' is already in use. Pick a free number.';
+        err.style.display='block';
+        return;
+      }
+      id=wanted;
+    }
+  }else{
+    id=getNextId();
+  }
+
+  // Merge onto the existing record so fields not shown in the form survive the edit.
+  var existing=isEdit?[].concat(catalogue,getAdditions()).find(function(c){return c.id===oldId;}):null;
+  var newCD=Object.assign({},existing||{},{
+    id:id,label:label,composers:composers,artist:artist,title:title,
     description:catNo?catNo+' · '+label:label,format:format,catNo:catNo,
-    usedGBP:usedGBP,newGBP:newGBP,notes:notes};
-  if(category) newCD.category=category;
-  if(sealed) newCD.sealed=true;
+    usedGBP:usedGBP,newGBP:newGBP,notes:notes});
+  if(category) newCD.category=category; else delete newCD.category;
+  if(sealed) newCD.sealed=true; else delete newCD.sealed;
+
   var additions=getAdditions();
-  if(_editingId){
-    var ei=additions.findIndex(function(c){return c.id===_editingId;});
+  if(isEdit){
+    var ei=additions.findIndex(function(c){return c.id===oldId;});
     if(ei!==-1)additions[ei]=newCD;else additions.push(newCD);
     _editingId=null;
   }else{additions.push(newCD);}
   saveAdditions(additions);
+  if(isEdit&&id!==oldId) renumberCDSideData(oldId,id);
   if(typeof _acquiringWLId!=='undefined'&&_acquiringWLId){
     saveWishlist(getWishlist().filter(function(w){return String(w.id)!==String(_acquiringWLId);}));
     _acquiringWLId=null;
@@ -2293,6 +2343,10 @@ async function lookupWLCatNo(){
       <button id="add-cd-close" onclick="closeAddCD()">&#10005;</button>
     </div>
     <div id="add-cd-body">
+      <div class="acd-field" id="acd-num-field" style="display:none">
+        <label>CD Number <span class="acd-hint">only change this if you want to renumber the CD</span></label>
+        <input id="acd-num" type="number" min="1" step="1">
+      </div>
       <div class="acd-field">
         <label>Catalogue Number <span class="acd-hint">optional — look up to pre-fill</span></label>
         <div style="display:flex;gap:.5rem"><input id="acd-catno" type="text" placeholder="e.g. CDA67288" style="flex:1" autocomplete="off"><button type="button" id="acd-lookup-btn" onclick="lookupCatNo()" style="background:#1B2B5B;color:#fff;border:none;padding:.6rem .9rem;border-radius:6px;font-size:.8rem;cursor:pointer;white-space:nowrap;font-family:inherit">🔍 Look Up</button></div><div id="acd-lookup-status" style="font-size:.75rem;margin-top:.3rem;min-height:1rem;color:#888"></div>
